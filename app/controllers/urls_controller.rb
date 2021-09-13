@@ -62,6 +62,27 @@ class UrlsController < ApplicationController
     end
   end
 
+  def api
+    urls = Url.includes(:clicks).last(10).reverse
+    urls = urls.map {|url| {
+      type: 'urls', 
+      id: url.id, 
+        attributes: {
+        'created-at': url.created_at,
+        'original-url': url.original_url,
+        url: "https://127.0.0.1:3000/#{url.short_url}",
+        clicks: url.clicks_count
+      },
+      relationships: {
+        clicks: {
+          data: url.clicks.map {|val| {id: val.id, type: 'clicks'}}
+        }
+      }
+    }}
+    
+    render json: urls
+  end
+
   def url_params
     params.require(:url).permit(:original_url)
   end
