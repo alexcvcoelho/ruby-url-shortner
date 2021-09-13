@@ -1,52 +1,68 @@
 # frozen_string_literal: true
 
+require 'json'
 class UrlsController < ApplicationController
   def index
-    # recent 10 short urls
     @url = Url.new
-    @urls = [
-      Url.new(short_url: 'ABCDE', original_url: 'http://google.com', created_at: Time.now),
-      Url.new(short_url: 'ABCDG', original_url: 'http://facebook.com', created_at: Time.now),
-      Url.new(short_url: 'ABCDF', original_url: 'http://yahoo.com', created_at: Time.now)
-    ]
+    @urls = Url.last(10).reverse
   end
 
   def create
-    raise 'add some code'
-    # create a new URL record
+    url = Url.new(url_params)
+    url.short_url = helpers.generate_short_url(5)
+    if url.valid?
+      url.save
+      flash[:success] = "Url created: http://localhost:3000/#{url.short_url}"
+    else
+      flash[:error] = url.errors.full_messages[0]
+    end
+    redirect_to action: 'index'
   end
 
   def show
-    @url = Url.new(short_url: 'ABCDE', original_url: 'http://google.com', created_at: Time.now)
-    # implement queries
-    @daily_clicks = [
-      ['1', 13],
-      ['2', 2],
-      ['3', 1],
-      ['4', 7],
-      ['5', 20],
-      ['6', 18],
-      ['7', 10],
-      ['8', 20],
-      ['9', 15],
-      ['10', 5]
-    ]
-    @browsers_clicks = [
-      ['IE', 13],
-      ['Firefox', 22],
-      ['Chrome', 17],
-      ['Safari', 7]
-    ]
-    @platform_clicks = [
-      ['Windows', 13],
-      ['macOS', 22],
-      ['Ubuntu', 17],
-      ['Other', 7]
-    ]
+    @url = Url.find_by_short_url params[:url]
+    @daily_clicks = []
+
+    clicks = Click.where('created_at BETWEEN ? AND ? AND url_id = ?',
+                         Date.current.beginning_of_month,
+                         Date.current.end_of_month,
+                         @url.id)
+
+    @daily_clicks = clicks
+                    .group_by { |click| click.created_at.day }
+                    .transform_values { |value| value.count }
+                    .map { |key, value| [key.to_s, value] }
+
+    @browsers_clicks = clicks
+                    .group_by { |click| click.browser }
+                    .transform_values { |value| value.count }
+                    .map { |key, value| [key, value] }
+
+    @platform_clicks = clicks
+                    .group_by { |click| click.platform }
+                    .transform_values { |value| value.count }
+                    .map { |key, value| [key, value] }
+
   end
 
   def visit
-    # params[:short_url]
-    render plain: 'redirecting to url...'
+    url = Url.find_by_short_url(params[:short_url])
+    browser_info = helpers.get_request_info(request)
+    if url
+      url.clicks_count += 1
+      url.save
+      Click.create(
+        url_id: url.id,
+        browser: browser_info[:browser],
+        platform: browser_info[:platform]
+      )
+      redirect_to url.original_url
+    else
+      render_404
+    end
+  end
+
+  def url_params
+    params.require(:url).permit(:original_url)
   end
 end
