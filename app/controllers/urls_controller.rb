@@ -11,8 +11,6 @@ class UrlsController < ApplicationController
     @urls = Url.last(10).reverse
   end
 
-
-
   def create
     url = Url.new(url_params)
     url.short_url = helpers.generate_short_url(5)
@@ -24,8 +22,6 @@ class UrlsController < ApplicationController
     end
     redirect_to action: 'index'
   end
-
-
 
   def show
     @url = Url.find_by_short_url params[:url]
@@ -54,8 +50,6 @@ class UrlsController < ApplicationController
                     .map { |key, value| [key.to_s, value] }
   end
 
-
-
   def visit
     url = Url.find_by_short_url(params[:short_url])
     browser_info = helpers.get_request_info(request)
@@ -72,8 +66,6 @@ class UrlsController < ApplicationController
       render_404
     end
   end
-
-
 
   def api
     urls = Url.includes(:clicks).last(10).reverse
@@ -114,8 +106,6 @@ class UrlsController < ApplicationController
     render json: urls
 
   end
-
-
 
   def url_params
 
