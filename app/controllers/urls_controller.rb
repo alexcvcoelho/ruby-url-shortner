@@ -1,11 +1,17 @@
 # frozen_string_literal: true
 
+
+
 require 'json'
+
 class UrlsController < ApplicationController
+
   def index
     @url = Url.new
     @urls = Url.last(10).reverse
   end
+
+
 
   def create
     url = Url.new(url_params)
@@ -19,6 +25,8 @@ class UrlsController < ApplicationController
     redirect_to action: 'index'
   end
 
+
+
   def show
     @url = Url.find_by_short_url params[:url]
     @daily_clicks = []
@@ -28,6 +36,8 @@ class UrlsController < ApplicationController
                          Date.current.end_of_month,
                          @url.id)
 
+
+
     @daily_clicks = clicks
                     .group_by { |click| click.created_at.day }
                     .transform_values { |value| value.count }
@@ -36,14 +46,15 @@ class UrlsController < ApplicationController
     @browsers_clicks = clicks
                     .group_by { |click| click.browser }
                     .transform_values { |value| value.count }
-                    .map { |key, value| [key, value] }
+                    .map { |key, value| [key.to_s, value] }
 
     @platform_clicks = clicks
                     .group_by { |click| click.platform }
                     .transform_values { |value| value.count }
-                    .map { |key, value| [key, value] }
-
+                    .map { |key, value| [key.to_s, value] }
   end
+
+
 
   def visit
     url = Url.find_by_short_url(params[:short_url])
@@ -62,28 +73,55 @@ class UrlsController < ApplicationController
     end
   end
 
+
+
   def api
     urls = Url.includes(:clicks).last(10).reverse
-    urls = urls.map {|url| {
-      type: 'urls', 
-      id: url.id, 
-        attributes: {
-        'created-at': url.created_at,
-        'original-url': url.original_url,
-        url: "https://127.0.0.1:3000/#{url.short_url}",
-        clicks: url.clicks_count
-      },
-      relationships: {
-        clicks: {
-          data: url.clicks.map {|val| {id: val.id, type: 'clicks'}}
+    clicks = []
+    urls.each do |url|
+      clicks.concat(url.clicks)
+    end
+    urls = {
+      data: urls.map {|url| {
+        type: 'urls',
+        id: url.id,
+          attributes: {
+          'created-at': url.created_at,
+          'original-url': url.original_url,
+          url: "https://127.0.0.1:3000/#{url.short_url}",
+          clicks: url.clicks_count
+        },
+        relationships: {
+          clicks: {
+            data: url.clicks.map {|val| {
+              id: val.id, 
+              type: 'clicks'
+            }}
+          }
         }
-      }
-    }}
-    
+      }},
+      included: clicks.map {|val| {
+          type: 'clicks', 
+          id: val.id, 
+          atributes: {
+            browser: val.browser,
+            platform: val.platform,
+            created_at: val.created_at
+          }
+        }}
+    }
+
     render json: urls
+
   end
 
+
+
   def url_params
+
     params.require(:url).permit(:original_url)
+
   end
+
 end
+
